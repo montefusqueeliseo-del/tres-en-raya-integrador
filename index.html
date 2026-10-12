@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -370,4 +371,378 @@ if (posicionMaquina === null) {
         cargarPartidas();
     </script>
 </body>
+=======
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tres en Raya</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            text-align: center;
+            margin: 0;
+            padding: 25px;
+        }
+
+        .contenedor {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            background: #2563eb;
+            color: white;
+        }
+
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        #tablero {
+            display: grid;
+            grid-template-columns: repeat(3, 90px);
+            gap: 6px;
+            justify-content: center;
+            margin: 20px auto;
+        }
+
+        .casilla {
+            width: 90px;
+            height: 90px;
+            font-size: 36px;
+            font-weight: bold;
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .casilla:hover:not(:disabled) {
+            background: #cbd5e1;
+        }
+
+        #mensaje {
+            font-weight: bold;
+            min-height: 24px;
+        }
+
+        ul {
+            text-align: left;
+            display: inline-block;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="contenedor">
+        <h1>🎮 Tres en Raya</h1>
+        <p>Jugá contra la máquina. Vos sos X y la máquina es O.</p>
+
+        <div>
+            <label for="nombre">Tu nombre:</label>
+            <input id="nombre" type="text" maxlength="30"
+                   placeholder="Escribí tu nombre">
+            <button id="iniciar">Nueva partida</button>
+        </div>
+
+        <p id="mensaje">Ingresá tu nombre e iniciá una partida.</p>
+
+        <div id="tablero"></div>
+
+        <button id="reiniciar" disabled>Jugar otra vez</button>
+
+        <hr>
+
+        <h2>Partidas guardadas</h2>
+        <button id="actualizar">Actualizar lista</button>
+        <ul id="listaPartidas"></ul>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+
+        const tablero = document.getElementById("tablero");
+        const mensaje = document.getElementById("mensaje");
+        const nombre = document.getElementById("nombre");
+        const botonIniciar = document.getElementById("iniciar");
+        const botonReiniciar = document.getElementById("reiniciar");
+        const listaPartidas = document.getElementById("listaPartidas");
+
+        let partidaId = null;
+        let casillas = Array(9).fill("");
+        let partidaTerminada = true;
+        let procesando = false;
+
+        const combinaciones = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        function comprobarGanador() {
+            for (const [a, b, c] of combinaciones) {
+                if (
+                    casillas[a] !== "" &&
+                    casillas[a] === casillas[b] &&
+                    casillas[b] === casillas[c]
+                ) {
+                    return casillas[a];
+                }
+            }
+
+            if (casillas.every(casilla => casilla !== "")) {
+                return "empate";
+            }
+
+            return null;
+        }
+
+        function dibujarTablero() {
+            tablero.innerHTML = "";
+
+            casillas.forEach((simbolo, indice) => {
+                const boton = document.createElement("button");
+                boton.className = "casilla";
+                boton.textContent = simbolo;
+                boton.disabled =
+                    partidaTerminada ||
+                    procesando ||
+                    simbolo !== "";
+
+                boton.setAttribute(
+                    "aria-label",
+                    "Casilla " + (indice + 1) +
+                    (simbolo ? ": " + simbolo : " vacía")
+                );
+
+                boton.addEventListener("click", () => jugar(indice));
+                tablero.appendChild(boton);
+            });
+        }
+
+        async function llamarAPI(ruta, opciones = {}) {
+            const respuesta = await fetch(API + ruta, {
+                ...opciones,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...opciones.headers
+                }
+            });
+
+            const datos = await respuesta.json();
+
+            if (!respuesta.ok) {
+                throw new Error(
+                    datos.detail || "Ocurrió un error en la API."
+                );
+            }
+
+            return datos;
+        }
+
+        async function guardarJugada(posicion, simbolo) {
+            await llamarAPI("/jugadas", {
+                method: "POST",
+                body: JSON.stringify({
+                    partida_id: partidaId,
+                    posicion: posicion + 1,
+                    simbolo: simbolo
+                })
+            });
+        }
+
+        async function terminarPartida(estado, texto) {
+            partidaTerminada = true;
+
+            await llamarAPI("/partidas/" + partidaId, {
+                method: "PUT",
+                body: JSON.stringify({ estado: estado })
+            });
+
+            mensaje.textContent = texto;
+            botonReiniciar.disabled = false;
+            dibujarTablero();
+            await cargarPartidas();
+        }
+
+        async function jugar(indice) {
+            if (
+                partidaTerminada ||
+                procesando ||
+                casillas[indice] !== ""
+            ) {
+                return;
+            }
+
+            procesando = true;
+            dibujarTablero();
+
+            try {
+                casillas[indice] = "X";
+                await guardarJugada(indice, "X");
+                dibujarTablero();
+
+                let resultado = comprobarGanador();
+
+                if (resultado === "X") {
+                    await terminarPartida("X ganó", "¡Ganaste!");
+                    return;
+                }
+
+                if (resultado === "empate") {
+                    await terminarPartida("empate", "¡Empate!");
+                    return;
+                }
+
+                mensaje.textContent = "Turno de la máquina...";
+
+                
+function buscarMovimiento(simbolo) {
+    for (let i = 0; i < casillas.length; i++) {
+        if (casillas[i] === "") {
+            casillas[i] = simbolo;
+
+            const resultado = comprobarGanador();
+
+            casillas[i] = "";
+
+            if (resultado === simbolo) {
+                return i;
+            }
+        }
+    }
+
+    return null;
+}
+
+let posicionMaquina = buscarMovimiento("O");
+
+if (posicionMaquina === null) {
+    posicionMaquina = buscarMovimiento("X");
+}
+
+if (posicionMaquina === null) {
+    const libres = casillas
+        .map((valor, posicion) => valor === "" ? posicion : -1)
+        .filter(posicion => posicion !== -1);
+
+    posicionMaquina =
+        libres[Math.floor(Math.random() * libres.length)];
+}
+
+                casillas[posicionMaquina] = "O";
+                await guardarJugada(posicionMaquina, "O");
+                dibujarTablero();
+
+                resultado = comprobarGanador();
+
+                if (resultado === "O") {
+                    await terminarPartida(
+                        "O ganó",
+                        "La máquina ganó. ¡Probá otra vez!"
+                    );
+                    return;
+                }
+
+                if (resultado === "empate") {
+                    await terminarPartida("empate", "¡Empate!");
+                    return;
+                }
+
+                mensaje.textContent = "Tu turno. Elegí una casilla.";
+            } catch (error) {
+                mensaje.textContent = "Error: " + error.message;
+            } finally {
+                procesando = false;
+                dibujarTablero();
+            }
+        }
+
+        async function iniciarPartida() {
+            const jugador = nombre.value.trim();
+
+            if (!jugador) {
+                mensaje.textContent = "Primero escribí tu nombre.";
+                return;
+            }
+
+            botonIniciar.disabled = true;
+
+            try {
+                const datos = await llamarAPI("/partidas", {
+                    method: "POST",
+                    body: JSON.stringify({ jugador: jugador })
+                });
+
+                partidaId = datos.id;
+                casillas = Array(9).fill("");
+                partidaTerminada = false;
+                botonReiniciar.disabled = true;
+                mensaje.textContent =
+                    "Partida #" + partidaId + ". ¡Tu turno!";
+                dibujarTablero();
+                await cargarPartidas();
+            } catch (error) {
+                mensaje.textContent = "Error: " + error.message;
+            } finally {
+                botonIniciar.disabled = false;
+            }
+        }
+
+        async function cargarPartidas() {
+            try {
+                const partidas = await llamarAPI("/partidas");
+                listaPartidas.innerHTML = "";
+
+                if (partidas.length === 0) {
+                    listaPartidas.textContent = "Todavía no hay partidas.";
+                    return;
+                }
+
+                partidas.forEach(partida => {
+                    const elemento = document.createElement("li");
+                    elemento.textContent =
+                        "#" + partida.id + " - " +
+                        partida.jugador + " - " +
+                        partida.estado;
+                    listaPartidas.appendChild(elemento);
+                });
+            } catch (error) {
+                listaPartidas.textContent =
+                    "No se pudo cargar la lista de partidas.";
+            }
+        }
+
+        botonIniciar.addEventListener("click", iniciarPartida);
+
+        botonReiniciar.addEventListener("click", iniciarPartida);
+
+        document.getElementById("actualizar")
+            .addEventListener("click", cargarPartidas);
+
+        dibujarTablero();
+        cargarPartidas();
+    </script>
+</body>
+>>>>>>> c30926d43c46f40f7e0dfebe33f8d97fb319c235
 </html>
