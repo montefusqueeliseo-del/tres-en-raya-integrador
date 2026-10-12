@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-
 import sqlite3
 
 from fastapi import FastAPI, HTTPException
@@ -349,8 +347,6 @@ def listar_jugadas(partida_id: int):
     ).fetchall()
 
     conexion.close()
-=======
-
 import sqlite3
 
 from fastapi import FastAPI, HTTPException
@@ -700,5 +696,4 @@ def listar_jugadas(partida_id: int):
     ).fetchall()
 
     conexion.close()
->>>>>>> c30926d43c46f40f7e0dfebe33f8d97fb319c235
     return [dict(fila) for fila in filas]
